@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Diet Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Ambient background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">🥗</span>
+      <span class="brand-name">AI Diet<em>Assistant</em></span>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link active">Analisis</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+    </div>
+  </nav>
+
+  <main class="main-container">
+    <!-- Hero Section -->
+    <header class="hero">
+      <div class="hero-badge">✦ Powered by OpenRouter AI</div>
+      <h1 class="hero-title">Kenali Kalori<br /><em>Makananmu</em></h1>
+      <p class="hero-subtitle">Foto makananmu dan biarkan AI menghitung kalori serta memberikan saran diet personal untukmu.</p>
+    </header>
+
+    <!-- API Key Input -->
+    <div class="apikey-card" id="apikeyCard">
+      <div class="apikey-icon">🔑</div>
+      <h3>Masukkan API Key OpenRouter</h3>
+      <p>Diperlukan OpenRouter API Key untuk menggunakan fitur analisis AI.</p>
+      <div class="apikey-input-group">
+        <input type="password" id="apiKeyInput" placeholder="sk-or-v1-..." class="apikey-input" />
+        <button class="btn-save-key" id="saveKeyBtn">Simpan</button>
+      </div>
+      <div class="apikey-hint">
+        <span>🔒</span> Key disimpan hanya di browser Anda (localStorage)
+      </div>
+    </div>
+
+    <!-- Camera / Upload Section -->
+    <section class="capture-section">
+      <div class="capture-actions">
+        <button class="btn-capture btn-camera" id="openCameraBtn">
+          <span class="btn-icon">📷</span>
+          <span class="btn-label">Buka Kamera</span>
+        </button>
+        <div class="capture-divider">atau</div>
+        <button class="btn-capture btn-upload" id="uploadBtn">
+          <span class="btn-icon">🖼️</span>
+          <span class="btn-label">Upload Gambar</span>
+        </button>
+        <input type="file" id="fileInput" accept="image/*" hidden />
+      </div>
+
+      <!-- Camera Modal -->
+      <div class="camera-modal" id="cameraModal">
+        <div class="camera-overlay" id="cameraOverlay"></div>
+        <div class="camera-container">
+          <div class="camera-header">
+            <span>📷 Kamera Aktif</span>
+            <button class="btn-close-camera" id="closeCameraBtn">✕</button>
+          </div>
+          <div class="camera-viewfinder">
+            <video id="cameraVideo" autoplay playsinline muted></video>
+            <div class="camera-frame">
+              <div class="frame-corner tl"></div>
+              <div class="frame-corner tr"></div>
+              <div class="frame-corner bl"></div>
+              <div class="frame-corner br"></div>
+            </div>
+            <div class="camera-hint">Posisikan makanan di dalam bingkai</div>
+          </div>
+          <button class="btn-shutter" id="shutterBtn">
+            <span class="shutter-inner"></span>
+          </button>
+          <canvas id="cameraCanvas" hidden></canvas>
+        </div>
+      </div>
+
+      <!-- Permission Error -->
+      <div class="permission-error" id="permissionError" hidden>
+        <span class="error-icon">🚫</span>
+        <div>
+          <strong>Akses Kamera Ditolak</strong>
+          <p>Izinkan akses kamera di pengaturan browser Anda, lalu muat ulang halaman.</p>
+        </div>
+        <button class="btn-dismiss" id="dismissPermError">✕</button>
+      </div>
+    </section>
+
+    <!-- Preview + Result Section -->
+    <section class="analysis-section" id="analysisSection" hidden>
+      <div class="analysis-grid">
+        <!-- Left: Image Preview -->
+        <div class="preview-card">
+          <div class="card-label">📸 Foto Makanan</div>
+          <div class="preview-wrapper">
+            <img id="previewImage" src="" alt="Preview makanan" class="preview-img" />
+            <button class="btn-retake" id="retakeBtn">🔄 Ambil Ulang</button>
+          </div>
+          <button class="btn-analyze" id="analyzeBtn">
+            <span class="analyze-text">✨ Analisis dengan AI</span>
+            <span class="analyze-loading" hidden>
+              <span class="spinner"></span> Menganalisis...
+            </span>
+          </button>
+        </div>
+
+        <!-- Right: AI Result -->
+        <div class="result-card" id="resultCard" hidden>
+          <div class="card-label">🤖 Hasil Analisis AI</div>
+
+          <div class="result-food">
+            <div class="result-food-icon" id="foodEmoji">🍽️</div>
+            <div class="result-food-info">
+              <div class="result-label">Terdeteksi</div>
+              <div class="result-food-name" id="foodName">—</div>
+            </div>
+          </div>
+
+          <div class="result-calories">
+            <div class="calories-label">Estimasi Kalori</div>
+            <div class="calories-value">
+              <span id="calMin">—</span>
+              <span class="cal-dash">–</span>
+              <span id="calMax">—</span>
+              <span class="cal-unit">kcal</span>
+            </div>
+            <div class="calories-bar-wrapper">
+              <div class="calories-bar" id="caloriesBar"></div>
+            </div>
+          </div>
+
+          <div class="result-recommendation">
+            <div class="rec-header">💡 Saran Diet</div>
+            <div class="rec-text" id="dietAdvice">—</div>
+          </div>
+
+          <div class="result-disclaimer">
+            ⚠️ Estimasi kalori hanya bersifat perkiraan dan dapat bervariasi tergantung porsi, cara memasak, dan bahan yang digunakan.
+          </div>
+
+          <button class="btn-save" id="saveBtn">
+            💾 Simpan ke Dashboard
+          </button>
+
+          <div class="save-success" id="saveSuccess" hidden>
+            ✅ Berhasil disimpan ke dashboard!
+          </div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div class="analysis-error" id="analysisError" hidden>
+        <span class="error-icon-lg">⚠️</span>
+        <div>
+          <strong>Analisis Gagal</strong>
+          <p id="analysisErrorMsg">Terjadi kesalahan saat menghubungi AI. Coba lagi.</p>
+        </div>
+        <button class="btn-retry" id="retryBtn">🔄 Coba Lagi</button>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="howto-section">
+      <h2 class="section-title">Cara Kerja</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <div class="step-icon">📷</div>
+          <h3>Foto Makanan</h3>
+          <p>Ambil foto langsung dari kamera atau upload dari galeri.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <div class="step-icon">🧠</div>
+          <h3>AI Menganalisis</h3>
+          <p>Claude Vision mengidentifikasi makanan dan memperkirakan kandungan kalori.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <div class="step-icon">📊</div>
+          <h3>Lacak di Dashboard</h3>
+          <p>Simpan hasil dan pantau total kalori harianmu di dashboard.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 AI Diet Assistant</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

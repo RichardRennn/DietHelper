@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — AI Diet Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">🥗</span>
+      <span class="brand-name">AI Diet<em>Assistant</em></span>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Analisis</a>
+      <a href="dashboard.html" class="nav-link active">Dashboard</a>
+    </div>
+  </nav>
+
+  <main class="main-container dashboard-container">
+    <!-- Page Header -->
+    <header class="page-header">
+      <h1 class="page-title">Dashboard <em>Kalori</em></h1>
+      <p class="page-subtitle">Pantau asupan kalori dan dapatkan saran diet harian dari AI.</p>
+    </header>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card stat-calories">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-info">
+          <div class="stat-label">Total Kalori Hari Ini</div>
+          <div class="stat-value" id="todayCalories">0</div>
+          <div class="stat-unit">kcal</div>
+        </div>
+        <div class="stat-bar-wrap">
+          <div class="stat-bar" id="calorieProgress"></div>
+          <div class="stat-bar-label" id="calorieProgressLabel">0% dari target 2000 kcal</div>
+        </div>
+      </div>
+
+      <div class="stat-card stat-meals">
+        <div class="stat-icon">🍽️</div>
+        <div class="stat-info">
+          <div class="stat-label">Makanan Hari Ini</div>
+          <div class="stat-value" id="todayMeals">0</div>
+          <div class="stat-unit">item</div>
+        </div>
+      </div>
+
+      <div class="stat-card stat-streak">
+        <div class="stat-icon">📅</div>
+        <div class="stat-info">
+          <div class="stat-label">Total Tersimpan</div>
+          <div class="stat-value" id="totalEntries">0</div>
+          <div class="stat-unit">entri</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Recommendation Banner -->
+    <div class="ai-rec-banner" id="aiRecBanner">
+      <div class="ai-rec-header">
+        <span class="ai-rec-icon">🤖</span>
+        <span class="ai-rec-title">Rekomendasi Diet AI Hari Ini</span>
+        <button class="btn-refresh-rec" id="refreshRecBtn" title="Refresh rekomendasi">↻</button>
+      </div>
+      <div class="ai-rec-body" id="aiRecBody">
+        <div class="ai-rec-loading" id="aiRecLoading" hidden>
+          <span class="spinner"></span> Memuat rekomendasi AI...
+        </div>
+        <div class="ai-rec-text" id="aiRecText">Klik ↻ untuk mendapatkan rekomendasi AI berdasarkan asupan kalori hari ini.</div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="controls-left">
+        <h2 class="section-title-sm">📋 Riwayat Makanan</h2>
+      </div>
+      <div class="controls-right">
+        <div class="filter-group">
+          <label class="filter-label">📅 Filter:</label>
+          <input type="date" id="filterDate" class="filter-date" />
+          <button class="btn-clear-filter" id="clearFilterBtn">Tampilkan Semua</button>
+        </div>
+        <button class="btn-danger" id="clearAllBtn">🗑️ Hapus Semua</button>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState" hidden>
+      <div class="empty-icon">🥗</div>
+      <h3>Belum Ada Data</h3>
+      <p>Mulai analisis makanan pertamamu dan simpan hasilnya di sini.</p>
+      <a href="index.html" class="btn-goto-analyze">📷 Mulai Analisis</a>
+    </div>
+
+    <!-- History List -->
+    <div class="history-grid" id="historyGrid"></div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal-overlay" id="confirmModal" hidden>
+      <div class="modal-box">
+        <div class="modal-icon">⚠️</div>
+        <h3>Hapus Semua Data?</h3>
+        <p>Semua riwayat makanan akan dihapus permanen dan tidak dapat dikembalikan.</p>
+        <div class="modal-actions">
+          <button class="btn-modal-cancel" id="cancelDeleteBtn">Batal</button>
+          <button class="btn-modal-confirm" id="confirmDeleteBtn">Ya, Hapus</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 AI Diet Assistant</p>
+  </footer>
+
+  <script src="script.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
