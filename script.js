@@ -1,7 +1,3 @@
-/* ============================================================
-   AI DIET ASSISTANT — script.js
-   Core logic: Camera, Image Upload, AI Vision & Text Analysis
-   ============================================================ */
 
 "use strict";
 
