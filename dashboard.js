@@ -1,32 +1,27 @@
-
 "use strict";
 
-// ── State ──────────────────────────────────────────────────
-let currentFilter = null;  // "YYYY-MM-DD" or null (all)
+let currentFilter = null;
+let isChatLoading = false;
 
-// ── Boot Dashboard ─────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   if (!document.getElementById("historyGrid")) return;
 
   setTodayAsFilterDefault();
   renderDashboard();
   initDashboardControls();
+  initDietChat();
 });
 
-// ── Set today as default filter (but show all initially) ───
 function setTodayAsFilterDefault() {
   const filterInput = document.getElementById("filterDate");
   if (filterInput) filterInput.value = todayKey();
-  // Don't actually filter by default — show all entries
 }
 
-// ── Render the full dashboard ──────────────────────────────
 function renderDashboard() {
   updateStats();
   renderHistory();
 }
 
-// ── Update stats row ───────────────────────────────────────
 function updateStats() {
   const { total, count } = calculateCalories(todayKey());
   const allEntries = loadData();
@@ -47,14 +42,13 @@ function updateStats() {
   if (lbl) lbl.textContent = `${Math.round(pct)}% dari target ${DAILY_TARGET.toLocaleString("id-ID")} kcal`;
 }
 
-// ── Render history list ────────────────────────────────────
 function renderHistory() {
-  const grid    = document.getElementById("historyGrid");
+  const grid = document.getElementById("historyGrid");
   const emptyEl = document.getElementById("emptyState");
   if (!grid) return;
 
   let entries = loadData();
-  if (currentFilter) entries = entries.filter(e => e.date === currentFilter);
+  if (currentFilter) entries = entries.filter(entry => entry.date === currentFilter);
 
   if (entries.length === 0) {
     grid.innerHTML = "";
@@ -63,11 +57,11 @@ function renderHistory() {
   }
 
   hideEl(emptyEl);
-  grid.innerHTML = entries.map((e, i) => buildCard(e, i)).join("");
+  grid.innerHTML = entries.map((entry, idx) => buildCard(entry, idx)).join("");
 
   grid.querySelectorAll(".btn-delete-entry").forEach(btn => {
     btn.addEventListener("click", () => {
-      const ts = parseInt(btn.dataset.ts);
+      const ts = parseInt(btn.dataset.ts, 10);
       deleteEntry(ts);
       renderDashboard();
     });
@@ -77,7 +71,7 @@ function renderHistory() {
 function buildCard(entry, idx) {
   const calRange = entry.calMin === entry.calMax
     ? entry.calMin.toLocaleString("id-ID")
-    : `${entry.calMin.toLocaleString("id-ID")}–${entry.calMax.toLocaleString("id-ID")}`;
+    : `${entry.calMin.toLocaleString("id-ID")}-${entry.calMax.toLocaleString("id-ID")}`;
 
   return `
   <div class="history-card" style="animation-delay:${idx * 60}ms">
@@ -95,11 +89,12 @@ function buildCard(entry, idx) {
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-// ── Dashboard Controls ─────────────────────────────────────
 function initDashboardControls() {
   const filterInput = document.getElementById("filterDate");
   filterInput?.addEventListener("change", () => {
@@ -126,73 +121,146 @@ function initDashboardControls() {
   document.getElementById("cancelDeleteBtn")?.addEventListener("click", () => {
     hideEl(document.getElementById("confirmModal"));
   });
-
-  document.getElementById("refreshRecBtn")?.addEventListener("click", fetchAIRecommendation);
 }
 
-// ── AI Daily Recommendation ────────────────────────────────
-async function fetchAIRecommendation() {
+function initDietChat() {
+  const form = document.getElementById("aiChatForm");
+  const input = document.getElementById("aiChatInput");
+
+  form?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const question = input?.value.trim();
+    if (!question || isChatLoading) return;
+    await submitDietQuestion(question);
+  });
+
+  document.querySelectorAll(".chat-suggestion-chip").forEach(chip => {
+    chip.addEventListener("click", async () => {
+      const question = chip.dataset.question?.trim();
+      if (!question || isChatLoading) return;
+      if (input) input.value = question;
+      await submitDietQuestion(question);
+    });
+  });
+}
+
+async function submitDietQuestion(question) {
   const apiKey = getApiKey();
   if (!apiKey) {
-    document.getElementById("aiRecText").textContent =
-      "⚠️ Masukkan API Key OpenRouter di halaman Analisis untuk mendapatkan rekomendasi AI.";
+    appendChatMessage("assistant", "Masukkan API Key Gemini di halaman Analisis terlebih dahulu agar saya bisa menjawab pertanyaanmu.");
+    updateChatStatus("API key belum tersedia");
     return;
   }
 
-  const { total, count } = calculateCalories(todayKey());
-  const loadEl     = document.getElementById("aiRecLoading");
-  const textEl     = document.getElementById("aiRecText");
-  const refreshBtn = document.getElementById("refreshRecBtn");
+  appendChatMessage("user", question);
 
-  showEl(loadEl);
-  textEl.textContent = "";
-  refreshBtn.disabled = true;
+  const input = document.getElementById("aiChatInput");
+  if (input) input.value = "";
+
+  setChatLoading(true);
+  updateChatStatus("AI sedang berpikir...");
 
   try {
-    const advice = await getDietRecommendation(total, count, apiKey);
-    hideEl(loadEl);
-    textEl.textContent = advice;
+    const answer = await getDietChatResponse(question, apiKey);
+    appendChatMessage("assistant", answer);
+    updateChatStatus("Jawaban siap");
   } catch (err) {
-    hideEl(loadEl);
-    textEl.textContent = `⚠️ Gagal memuat rekomendasi: ${err.message}`;
+    appendChatMessage("assistant", `Maaf, saya belum bisa menjawab sekarang. ${err.message}`);
+    updateChatStatus("Terjadi kendala");
   } finally {
-    refreshBtn.disabled = false;
+    setChatLoading(false);
   }
 }
 
-// ── OpenRouter API call — Text ─────────────────────────────
-async function getDietRecommendation(totalCalories, mealCount, apiKey) {
-  const today   = new Date().toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long" });
-  const entries = loadData().filter(e => e.date === todayKey());
-  const foods   = entries.map(e => e.foodName).join(", ") || "belum ada";
+function appendChatMessage(role, text) {
+  const container = document.getElementById("aiChatMessages");
+  if (!container) return;
 
-  const prompt = `Hari ini ${today}, seseorang telah mengonsumsi ${mealCount} makanan dengan total estimasi kalori sekitar ${totalCalories} kcal.
-Makanan yang dikonsumsi: ${foods}.
-Target kalori harian adalah ${DAILY_TARGET} kcal.
-Berikan saran diet singkat (3-4 kalimat) dalam Bahasa Indonesia yang personal, praktis, dan memotivasi berdasarkan data tersebut. Sertakan rekomendasi makanan berikutnya jika relevan.`;
+  const wrapper = document.createElement("div");
+  wrapper.className = `chat-message ${role}`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble";
+  bubble.textContent = text;
+
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
+  container.scrollTop = container.scrollHeight;
+}
+
+function setChatLoading(on) {
+  isChatLoading = on;
+
+  const loadingEl = document.getElementById("aiChatLoading");
+  const input = document.getElementById("aiChatInput");
+  const sendBtn = document.getElementById("sendChatBtn");
+
+  on ? showEl(loadingEl) : hideEl(loadingEl);
+  if (input) input.disabled = on;
+  if (sendBtn) sendBtn.disabled = on;
+}
+
+function updateChatStatus(text) {
+  const status = document.getElementById("aiChatStatus");
+  if (status) status.textContent = text;
+}
+
+async function getDietChatResponse(question, apiKey) {
+  const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+  const entries = loadData().filter(entry => entry.date === todayKey());
+  const { total, count } = calculateCalories(todayKey());
+  const foods = entries.length
+    ? entries.map(entry => `${entry.foodName} (${entry.calMin}-${entry.calMax} kcal)`).join(", ")
+    : "belum ada data makanan yang disimpan hari ini";
+
+  const prompt = `Anda adalah chatbot asisten diet dan kebugaran. Jawab selalu dalam Bahasa Indonesia dengan gaya ramah, praktis, dan aman.
+
+Konteks pengguna hari ini:
+- Tanggal: ${today}
+- Total estimasi kalori: ${total} kcal
+- Jumlah makanan tersimpan: ${count}
+- Daftar makanan: ${foods}
+- Target kalori harian: ${DAILY_TARGET} kcal
+
+Aturan jawaban:
+- Fokus menjawab pertanyaan pengguna tentang diet, makanan, camilan, pola makan, hidrasi, dan rekomendasi olahraga ringan-sedang.
+- Gunakan data harian pengguna bila relevan.
+- Beri jawaban ringkas tapi berguna, maksimal sekitar 6 kalimat.
+- Jika pertanyaan menyangkut kondisi medis serius, alergi berat, atau cedera, sarankan konsultasi profesional.
+- Jangan mengaku melihat data selain yang diberikan di atas.
+
+Pertanyaan pengguna:
+${question}`;
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "AI Diet Assistant"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "openrouter/free",
-      max_tokens: 350,
-      messages: [{ role: "user", content: prompt }]
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 450,
+        temperature: 0.7
+      }
     })
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${response.status}`);
+    throw new Error(err?.error?.message || `Gemini API Error: HTTP ${response.status}`);
   }
 
   const data = await response.json();
-  // OpenRouter menggunakan format OpenAI: choices[0].message.content
-  return data.choices?.[0]?.message?.content?.trim() ||
-         "Tidak dapat menghasilkan rekomendasi saat ini.";
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+         "Saya belum bisa memberikan jawaban saat ini.";
 }

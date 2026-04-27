@@ -1,3 +1,7 @@
+/* ============================================================
+   AI DIET ASSISTANT — script.js
+   Core logic: Camera, Image Upload, AI Vision & Text Analysis
+   ============================================================ */
 
 "use strict";
 
@@ -48,7 +52,7 @@ function initApiKeyUI() {
 
   saveBtn.addEventListener("click", () => {
     const key = input.value.trim();
-    if (!key) { alert("Masukkan API Key terlebih dahulu."); return; }
+    if (!key) { alert("Masukkan API Key Gemini terlebih dahulu."); return; }
     localStorage.setItem(APIKEY_STORE, key);
     card.classList.add("apikey-saved");
     saveBtn.textContent = "✓ Tersimpan";
@@ -171,7 +175,7 @@ function initAnalysis() {
   analyzeBtn.addEventListener("click", async () => {
     if (!capturedImageBase64) { alert("Ambil atau upload gambar terlebih dahulu."); return; }
     const apiKey = getApiKey();
-    if (!apiKey) { alert("Masukkan API Key OpenRouter terlebih dahulu di bagian atas halaman."); return; }
+    if (!apiKey) { alert("Masukkan API Key Gemini terlebih dahulu di bagian atas halaman."); return; }
 
     setAnalyzeLoading(true);
     hideEl($("resultCard"));
@@ -204,7 +208,7 @@ function setAnalyzeLoading(on) {
   on ? (showEl(load), hideEl(text)) : (hideEl(load), showEl(text));
 }
 
-// ── OpenRouter API call — Vision ──────────────────────────
+// ── Gemini API call — Vision ──────────────────────────────
 async function analyzeFood(dataUrl, apiKey) {
   const systemPrompt = `Anda adalah asisten diet AI yang ahli mengenali makanan dari gambar dan menghitung estimasi kalori. Selalu jawab dalam Bahasa Indonesia. 
 Kembalikan HANYA JSON valid (tanpa markdown/backtick) dengan format persis berikut:
@@ -218,48 +222,54 @@ Kembalikan HANYA JSON valid (tanpa markdown/backtick) dengan format persis berik
 }
 Jika gambar tidak menunjukkan makanan, set foodName ke "Bukan Makanan" dan calMin/calMax ke 0.`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // Konversi data URL ke base64
+  const base64 = dataUrl.split(",")[1];
+  const mimeType = dataUrl.match(/data:([^;]+)/)?.[1] || "image/jpeg";
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "AI Diet Assistant"
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "openrouter/free", // ✅ Otomatis diarahkan ke model Vision gratis yang sedang aktif
-      max_tokens: 600,
-      messages: [
+      contents: [
         {
           role: "user",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: [
+          parts: [
             {
-              type: "image_url",
-              image_url: { url: dataUrl }   // OpenRouter terima data URL langsung
+              text: systemPrompt
             },
             {
-              type: "text",
+              inline_data: {
+                mime_type: mimeType,
+                data: base64
+              }
+            },
+            {
               text: "Analisis makanan dalam gambar ini. Berikan nama makanan, estimasi kalori (min-max), dan saran diet dalam format JSON."
             }
           ]
         }
-      ]
+      ],
+      generationConfig: {
+        maxOutputTokens: 600
+      }
     })
   });
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
     const msg = errData?.error?.message || `HTTP ${response.status}`;
-    throw new Error(`OpenRouter API Error: ${msg}`);
+    throw new Error(`Gemini API Error: ${msg}`);
   }
 
   const data = await response.json();
-  // OpenRouter pakai format OpenAI: choices[0].message.content
-  const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+  // Gemini pakai format: contents[0].parts[0].text
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+  if (!rawText) {
+    throw new Error("Gemini mengembalikan respons kosong. Coba lagi.");
+  }
 
   // Bersihkan markdown fences jika ada
   const clean = rawText.replace(/```json|```/gi, "").trim();
